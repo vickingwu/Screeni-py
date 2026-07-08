@@ -41,6 +41,13 @@ argParser.add_argument('-d', '--download', action='store_true', help='Only Downl
 argParser.add_argument('-v', action='store_true')        # Dummy Arg for pytest -v
 argParser.add_argument('--mode', choices=['classic', 'ai'], default=None, help='Workflow mode: classic or ai')
 argParser.add_argument('--agent', type=str, default=None, help='Agent persona name for AI mode (e.g. swing_trader)')
+# Non-interactive scanning (used by GitHub Actions / CI). Provide a comma-separated
+# list of stock codes to screen them without any interactive prompts.
+argParser.add_argument('--stocks', type=str, default=None, help='Comma-separated stock codes to screen non-interactively, e.g. "SBIN,INFY,TCS"')
+argParser.add_argument('--criteria', type=int, default=0, help='Screening criteria (execute option). 0=Full, 1=Breakout/Consolidation, 2=Recent Breakout & Volume, 3=Consolidating, 4=Lowest Volume, 5=RSI, 6=Reversal, 7=Chart Pattern. Default: 0')
+argParser.add_argument('--param1', type=str, default=None, help='First extra parameter for criteria that need it (e.g. days for criteria 4, min RSI for 5, reversal type for 6, pattern for 7)')
+argParser.add_argument('--param2', type=str, default=None, help='Second extra parameter (e.g. max RSI for criteria 5, MA length / lookback for 6 and 7)')
+argParser.add_argument('--output', type=str, default=None, help='Path to save screening results (.xlsx or .csv). Enables non-interactive auto-save.')
 args, _ = argParser.parse_known_args()  # parse_known_args ignores Streamlit's own CLI args (--server.port, etc.)
 
 # Try Fixing bug with this symbol
@@ -172,7 +179,7 @@ def initExecution():
     return tickerOption, executeOption
 
 # Main function
-def main(testing=False, testBuild=False, downloadOnly=False, execute_inputs:list = [], isDevVersion=None, backtestDate=date.today()):
+def main(testing=False, testBuild=False, downloadOnly=False, execute_inputs:list = [], isDevVersion=None, backtestDate=date.today(), autoSaveFile=None):
     global screenCounter, screenResultsCounter, stockDict, loadedStockData, keyboardInterruptEvent, loadCount, maLength, newlyListedOnly, vectorSearch
     screenCounter = multiprocessing.Value('i', 1)
     screenResultsCounter = multiprocessing.Value('i', 0)
@@ -483,6 +490,21 @@ def main(testing=False, testBuild=False, downloadOnly=False, execute_inputs:list
 
         Utility.tools.setLastScreenedResults(screenResults)
         Utility.tools.setLastScreenedResults(saveResults, unformatted=True)
+        if autoSaveFile:
+            # Non-interactive save (used by GitHub Actions / CI). No prompts.
+            try:
+                if str(autoSaveFile).lower().endswith('.csv'):
+                    saveResults.to_csv(autoSaveFile)
+                else:
+                    saveResults.to_excel(autoSaveFile)
+                print(colorText.BOLD + colorText.GREEN +
+                      ("[+] Results saved to %s" % autoSaveFile) + colorText.END)
+            except Exception as e:
+                print(colorText.BOLD + colorText.FAIL +
+                      ("[+] Failed to save results to %s: %s" % (autoSaveFile, e)) + colorText.END)
+            newlyListedOnly = False
+            vectorSearch = False
+            return screenResults
         if not testBuild and not downloadOnly:
             Utility.tools.promptSaveResults(saveResults)
             print(colorText.BOLD + colorText.WARN +
@@ -579,6 +601,19 @@ if __name__ == "__main__":
             print('[!] Install with: pip install openai-agents pyyaml')
             sys.exit(1)
 
+    elif args.stocks:
+        # Non-interactive screening of a specific list of stock codes (for CI / GitHub Actions).
+        print(colorText.BOLD + colorText.FAIL +
+              "[+] Non-interactive scan mode! Screening: " + args.stocks + colorText.END)
+        # execute_inputs format for "Screen by NSE Stock Code" is:
+        #   [tickerOption=0, criteria, "CODE1,CODE2,...", <param1>, <param2>]
+        execute_inputs = [0, args.criteria, args.stocks]
+        if args.param1 is not None:
+            execute_inputs.append(args.param1)
+        if args.param2 is not None:
+            execute_inputs.append(args.param2)
+        outputFile = args.output if args.output else 'screenipy-result.xlsx'
+        main(execute_inputs=execute_inputs, isDevVersion=isDevVersion, autoSaveFile=outputFile)
     elif args.testbuild:
         print(colorText.BOLD + colorText.FAIL +"[+] Started in TestBuild mode!" + colorText.END)
         main(testBuild=True)

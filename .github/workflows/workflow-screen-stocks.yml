@@ -1,0 +1,83 @@
+# Project             :   Screenipy (fork)
+# Description         :   Manually-triggered workflow to screen one or more stock
+#                         codes from the GitHub UI and download the results.
+#
+# How to use:
+#   1. Open the "Actions" tab of your fork on GitHub.
+#   2. Select "Screenipy - Screen Stocks (Manual)".
+#   3. Click "Run workflow", type your comma-separated stock codes
+#      (e.g. SBIN,INFY,TCS), pick a screening criteria, and run.
+#   4. When it finishes, download the results from the run's "Artifacts".
+
+name: Screenipy - Screen Stocks (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      stocks:
+        description: 'Stock codes to screen (comma-separated), e.g. SBIN,INFY,TCS'
+        required: true
+        default: 'SBIN,INFY,TCS'
+      criteria:
+        description: 'Screening criteria'
+        required: true
+        default: '0 - Full Screening (all technicals)'
+        type: choice
+        options:
+          - '0 - Full Screening (all technicals)'
+          - '1 - Breakout or Consolidation'
+          - '2 - Recent Breakout & Volume'
+          - '3 - Consolidating stocks'
+      output_format:
+        description: 'Result file format'
+        required: true
+        default: 'xlsx'
+        type: choice
+        options:
+          - 'xlsx'
+          - 'csv'
+
+jobs:
+
+  Screen_Stocks:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11.6
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11.6
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        # These two have conflicting numpy pins, so install without deps (as per Dockerfile/CI).
+        pip install --no-deps advanced-ta
+        pip install --no-deps pandas-ta-remake
+
+    - name: Screen Stocks
+      run: |
+        # Extract the leading number from the criteria choice (e.g. "2 - ..." -> "2").
+        CRITERIA_NUM=$(echo "${{ github.event.inputs.criteria }}" | cut -d' ' -f1)
+        OUTPUT_FILE="screenipy-result.${{ github.event.inputs.output_format }}"
+        echo "Screening: ${{ github.event.inputs.stocks }}"
+        echo "Criteria : $CRITERIA_NUM"
+        echo "Output   : $OUTPUT_FILE"
+        python src/screenipy.py \
+          --stocks "${{ github.event.inputs.stocks }}" \
+          --criteria "$CRITERIA_NUM" \
+          --output "$OUTPUT_FILE"
+
+    - name: Upload Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: screenipy-results
+        path: |
+          screenipy-result.xlsx
+          screenipy-result.csv
+        if-no-files-found: warn
+        retention-days: 30
