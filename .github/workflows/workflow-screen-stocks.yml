@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       stocks:
-        description: 'Stock codes to screen (comma-separated), e.g. SBIN,INFY,TCS'
+        description: 'Codes (comma-separated). NSE: SBIN,INFY. A-share auto-detected: 600519,000001. Or force a suffix: 600519.SS,AAPL'
         required: true
         default: 'SBIN,INFY,TCS'
       criteria:

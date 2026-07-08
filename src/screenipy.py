@@ -607,7 +607,7 @@ if __name__ == "__main__":
               "[+] Non-interactive scan mode! Screening: " + args.stocks + colorText.END)
         # execute_inputs format for "Screen by NSE Stock Code" is:
         #   [tickerOption=0, criteria, "CODE1,CODE2,...", <param1>, <param2>]
-        execute_inputs = [0, args.criteria, args.stocks]
+        execute_inputs = [0, args.criteria, args.stocks.upper()]
         if args.param1 is not None:
             execute_inputs.append(args.param1)
         if args.param2 is not None:

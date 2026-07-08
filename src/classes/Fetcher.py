@@ -205,13 +205,37 @@ class tools:
 
         return listStockCodes
 
+    # Auto-detect the Yahoo Finance exchange suffix from the stock code itself.
+    # This lets a single code list mix markets without the user typing suffixes:
+    #   - Code already contains a suffix (e.g. "600519.SS", "AAPL") -> keep as-is
+    #   - US S&P 500 / sectoral index options (15/16)               -> no suffix
+    #   - 6-digit China A-share codes -> .SS (Shanghai) / .SZ (Shenzhen) / .BJ (Beijing)
+    #   - Everything else (NSE India, the default)                  -> .NS
+    @staticmethod
+    def detectExchangeSuffix(stockCode, tickerOption=None):
+        code = str(stockCode).strip().upper()
+        # Respect an explicit suffix the user already provided.
+        if '.' in code:
+            return ""
+        # US S&P 500 / NSE sectoral indices are fetched with the bare symbol.
+        if tickerOption == 15 or tickerOption == 16:
+            return ""
+        # China A-shares use 6-digit numeric codes.
+        if code.isdigit() and len(code) == 6:
+            lead = code[0]
+            if lead in ('6', '9', '5'):     # Shanghai: main board / B-share / funds
+                return ".SS"
+            if lead in ('4', '8'):          # Beijing Stock Exchange
+                return ".BJ"
+            return ".SZ"                    # Shenzhen: 0/2/3/1 (main / ChiNext / B-share)
+        # Default preserves original behaviour: NSE India.
+        return ".NS"
+
     # Fetch stock price data from Yahoo finance
     def fetchStockData(self, stockCode, period, duration, proxyServer, screenResultsCounter, screenCounter, totalSymbols, backtestDate=None, printCounter=False, tickerOption=None):
         dateDict = None
         with SuppressOutput(suppress_stdout=True, suppress_stderr=True):
-            append_exchange = ".NS"
-            if tickerOption == 15 or tickerOption == 16:
-                append_exchange = ""
+            append_exchange = self.detectExchangeSuffix(stockCode, tickerOption)
             _start, _end = self._getBacktestDate(backtest=backtestDate)
             _dl_kwargs = dict(
                 tickers=stockCode + append_exchange,
