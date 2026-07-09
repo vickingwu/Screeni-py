@@ -36,6 +36,34 @@ on:
         options:
           - 'xlsx'
           - 'csv'
+      min_price:
+        description: 'Min price filter (A-share CNY suggested: 2)'
+        required: true
+        default: '2.0'
+      max_price:
+        description: 'Max price filter (A-share CNY suggested: 3000)'
+        required: true
+        default: '3000.0'
+      volume_ratio:
+        description: 'Volume-spike ratio for breakout (A-share suggested: 1.5)'
+        required: true
+        default: '1.5'
+      consolidation_pct:
+        description: 'Consolidation range %% (A-share suggested: 15)'
+        required: true
+        default: '15'
+      days_to_lookback:
+        description: 'Days to look back for breakout/consolidation'
+        required: true
+        default: '30'
+      only_stage_two:
+        description: 'Only Stage-2 (uptrend) stocks?'
+        required: true
+        default: 'n'
+        type: choice
+        options:
+          - 'n'
+          - 'y'
 
 jobs:
 
@@ -58,6 +86,27 @@ jobs:
         # These two have conflicting numpy pins, so install without deps (as per Dockerfile/CI).
         pip install --no-deps advanced-ta
         pip install --no-deps pandas-ta-remake
+
+    - name: Write screening config from inputs
+      run: |
+        # screenipy.py reads screenipy.ini from the working directory (repo root).
+        # Generate it from the workflow inputs so thresholds are configurable per-run.
+        cat > screenipy.ini <<EOF
+        [config]
+        period = 300d
+        daystolookback = ${{ github.event.inputs.days_to_lookback }}
+        duration = 1d
+        minprice = ${{ github.event.inputs.min_price }}
+        maxprice = ${{ github.event.inputs.max_price }}
+        volumeratio = ${{ github.event.inputs.volume_ratio }}
+        consolidationpercentage = ${{ github.event.inputs.consolidation_pct }}
+        shuffle = y
+        cachestockdata = y
+        onlystagetwostocks = ${{ github.event.inputs.only_stage_two }}
+        useema = n
+        EOF
+        echo "----- screenipy.ini -----"
+        cat screenipy.ini
 
     - name: Screen Stocks
       run: |
