@@ -1,0 +1,96 @@
+# Whole-market A-share breakout scanner (data via akshare / Eastmoney).
+# Scans ALL A-shares, finds stocks breaking out above their prior N-day high
+# with volume confirmation, and uploads the result as an artifact.
+#
+# How to use:
+#   1. Actions tab -> "A-share Breakout Scan (Whole Market)"
+#   2. Run workflow, adjust thresholds if needed, Run.
+#   3. Download the "ashare-breakout" artifact when done.
+
+name: A-share Breakout Scan (Whole Market)
+
+on:
+  workflow_dispatch:
+    inputs:
+      lookback:
+        description: 'Breakout window: close must exceed prior N-day high'
+        required: true
+        default: '60'
+      volume_ratio:
+        description: 'Volume confirmation: today volume >= X * 20-day avg'
+        required: true
+        default: '1.5'
+      min_change_pct:
+        description: 'Stage-1 prefilter: stock up at least this %% today'
+        required: true
+        default: '2'
+      min_price:
+        description: 'Min price (CNY)'
+        required: true
+        default: '3'
+      max_price:
+        description: 'Max price (CNY)'
+        required: true
+        default: '3000'
+      max_rsi:
+        description: 'Exclude if RSI above this (0 = keep all / no overbought filter)'
+        required: true
+        default: '85'
+      exclude_st:
+        description: 'Exclude ST / *ST / delisting stocks?'
+        required: true
+        default: 'y'
+        type: choice
+        options:
+          - 'y'
+          - 'n'
+      output_format:
+        description: 'Result file format'
+        required: true
+        default: 'csv'
+        type: choice
+        options:
+          - 'csv'
+          - 'xlsx'
+
+jobs:
+
+  Scan_AShare:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install akshare pandas openpyxl
+
+    - name: Run A-share breakout scan
+      run: |
+        OUTPUT_FILE="ashare-breakout.${{ github.event.inputs.output_format }}"
+        python src/scan_ashare_breakout.py \
+          --lookback "${{ github.event.inputs.lookback }}" \
+          --volume-ratio "${{ github.event.inputs.volume_ratio }}" \
+          --min-change-pct "${{ github.event.inputs.min_change_pct }}" \
+          --min-price "${{ github.event.inputs.min_price }}" \
+          --max-price "${{ github.event.inputs.max_price }}" \
+          --max-rsi "${{ github.event.inputs.max_rsi }}" \
+          --exclude-st "${{ github.event.inputs.exclude_st }}" \
+          --output "$OUTPUT_FILE"
+
+    - name: Upload results
+      uses: actions/upload-artifact@v4
+      with:
+        name: ashare-breakout
+        path: |
+          ashare-breakout.csv
+          ashare-breakout.xlsx
+        if-no-files-found: warn
+        retention-days: 30
