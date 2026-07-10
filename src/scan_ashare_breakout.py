@@ -190,9 +190,12 @@ def check_breakout(code, name, lookback, volume_ratio, max_rsi, history_days):
 def _save(df, path):
     try:
         if str(path).lower().endswith(".xlsx"):
+            # openpyxl writes native Unicode; string codes keep their leading zeros.
             df.to_excel(path, index=False)
         else:
-            df.to_csv(path, index=False)
+            # utf-8-sig adds a BOM so Excel (esp. Chinese locale) reads UTF-8
+            # correctly instead of mangling Chinese names as GBK.
+            df.to_csv(path, index=False, encoding="utf-8-sig")
         print(f"[+] Results saved to {path}")
     except Exception as e:
         print(f"[!] Failed to save {path}: {e}")

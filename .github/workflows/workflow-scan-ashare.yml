@@ -53,13 +53,13 @@ on:
         required: true
         default: '6'
       output_format:
-        description: 'Result file format'
+        description: 'Result file format (xlsx recommended for Chinese names)'
         required: true
-        default: 'csv'
+        default: 'xlsx'
         type: choice
         options:
-          - 'csv'
           - 'xlsx'
+          - 'csv'
 
 jobs:
 
@@ -68,10 +68,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Set up Python 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.11'
 
@@ -96,7 +96,7 @@ jobs:
           --output "$OUTPUT_FILE"
 
     - name: Upload results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ashare-breakout
         path: |
