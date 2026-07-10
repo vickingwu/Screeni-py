@@ -97,7 +97,12 @@ def get_snapshot():
 
 def prefilter(df, min_price, max_price, min_change_pct, volume_ratio, exclude_st, top_n):
     df = df.copy()
-    df = df[df["code"].str.match(r"^(60|68|00|30)")]
+    # Strictly 6-digit A-share codes only. The trailing \d{4}$ anchor is important:
+    # it excludes 5-digit Hong Kong codes (e.g. 00700) that would otherwise slip
+    # past a bare "^00" prefix match. Boards kept: SH main 600/601/603/605,
+    # STAR 688, SZ main 000/001/002/003, ChiNext 300/301. Excludes HK, Beijing
+    # (8x/4x), and B-shares (900/200).
+    df = df[df["code"].str.match(r"^(60|68|00|30)\d{4}$")]
     if exclude_st:
         df = df[~df["name"].str.contains("ST|st|退", regex=True, na=False)]
     df = df[(df["price"] >= min_price) & (df["price"] <= max_price)]
