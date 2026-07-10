@@ -44,6 +44,14 @@ on:
         options:
           - 'y'
           - 'n'
+      top_prefilter:
+        description: 'Max candidates to confirm in stage 2 (higher = more coverage, slower)'
+        required: true
+        default: '800'
+      workers:
+        description: 'Parallel history-fetch threads (higher = faster, risk of throttling)'
+        required: true
+        default: '6'
       output_format:
         description: 'Result file format'
         required: true
@@ -83,6 +91,8 @@ jobs:
           --max-price "${{ github.event.inputs.max_price }}" \
           --max-rsi "${{ github.event.inputs.max_rsi }}" \
           --exclude-st "${{ github.event.inputs.exclude_st }}" \
+          --top-prefilter "${{ github.event.inputs.top_prefilter }}" \
+          --workers "${{ github.event.inputs.workers }}" \
           --output "$OUTPUT_FILE"
 
     - name: Upload results
