@@ -75,23 +75,23 @@ def _normalize_snapshot(df):
 
 
 def get_snapshot():
-    """Try Eastmoney, then Sina. Returns (normalized_df, source_name)."""
+    """Try Sina first (Eastmoney is often blocked from non-CN IPs), then Eastmoney.
+    Returns (normalized_df, source_name)."""
     providers = [
-        ("eastmoney", lambda: ak.stock_zh_a_spot_em()),
         ("sina", lambda: ak.stock_zh_a_spot()),
+        ("eastmoney", lambda: ak.stock_zh_a_spot_em()),
     ]
     last_err = None
     for name, fn in providers:
-        for attempt in range(2):
-            try:
-                df = fn()
-                if df is not None and len(df) > 0:
-                    print(f"[+] Snapshot source: {name} ({len(df)} rows)")
-                    return _normalize_snapshot(df), name
-            except Exception as e:
-                last_err = e
-                print(f"[!] Snapshot via {name} attempt {attempt + 1} failed: {e}")
-                time.sleep(3 * (attempt + 1))
+        try:
+            print(f"[+] Trying snapshot source: {name} ...")
+            df = fn()
+            if df is not None and len(df) > 0:
+                print(f"[+] Snapshot source OK: {name} ({len(df)} rows)")
+                return _normalize_snapshot(df), name
+        except Exception as e:
+            last_err = e
+            print(f"[!] Snapshot via {name} failed: {e}")
     raise RuntimeError(f"All snapshot providers failed. Last error: {last_err}")
 
 
@@ -117,17 +117,17 @@ def prefilter(df, min_price, max_price, min_change_pct, volume_ratio, exclude_st
 # --------------------------- Stage 2: breakout check --------------------------
 
 def _get_history(code, start, end):
-    """Try Eastmoney hist, then Sina daily. Returns a DataFrame or None."""
+    """Try Sina daily first, then Eastmoney hist. Returns a DataFrame or None."""
     try:
-        h = ak.stock_zh_a_hist(symbol=code, period="daily",
-                               start_date=start, end_date=end, adjust="qfq")
+        h = ak.stock_zh_a_daily(symbol=_sina_symbol(code), start_date=start,
+                                end_date=end, adjust="qfq")
         if h is not None and len(h) > 0:
             return h
     except Exception:
         pass
     try:
-        h = ak.stock_zh_a_daily(symbol=_sina_symbol(code), start_date=start,
-                                end_date=end, adjust="qfq")
+        h = ak.stock_zh_a_hist(symbol=code, period="daily",
+                               start_date=start, end_date=end, adjust="qfq")
         if h is not None and len(h) > 0:
             return h
     except Exception:
